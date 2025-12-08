@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/alecthomas/kong v1.13.0
-	github.com/anthropics/anthropic-sdk-go v1.18.1
+	github.com/anthropics/anthropic-sdk-go v1.19.0
 	github.com/charmbracelet/colorprofile v0.3.3
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1
 	github.com/google/jsonschema-go v0.3.0
