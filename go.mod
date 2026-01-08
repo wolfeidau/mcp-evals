@@ -7,7 +7,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.18.1
 	github.com/charmbracelet/colorprofile v0.3.3
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1
-	github.com/google/jsonschema-go v0.3.0
+	github.com/google/jsonschema-go v0.4.2
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
