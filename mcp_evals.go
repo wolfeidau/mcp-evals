@@ -241,7 +241,7 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 			// MCP uses JSON Schema, convert to map
 			schemaBytes, _ := json.Marshal(tool.InputSchema)
 			var schema map[string]any
-			if err = json.Unmarshal(schemaBytes, &schema); err == nil {
+			if err := json.Unmarshal(schemaBytes, &schema); err == nil {
 				if props, ok := schema["properties"].(map[string]any); ok {
 					properties = props
 				}
@@ -260,13 +260,9 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 
 	// Add cache control to the last tool definition if caching is enabled
 	// This creates a cache breakpoint after all tools, maximizing cache reuse
-	if ec.config.EnablePromptCaching != nil && *ec.config.EnablePromptCaching && len(toolParams) > 0 {
+	if ec.cachingEnabled() && len(toolParams) > 0 {
 		lastIdx := len(toolParams) - 1
-		toolParams[lastIdx].CacheControl = anthropic.NewCacheControlEphemeralParam()
-		// Set TTL if specified (5m or 1h)
-		if ec.config.CacheTTL == "1h" {
-			toolParams[lastIdx].CacheControl.TTL = "1h"
-		}
+		toolParams[lastIdx].CacheControl = ec.newCacheControl()
 	}
 
 	tools := make([]anthropic.ToolUnionParam, len(toolParams))
@@ -305,11 +301,8 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 		systemPrompt := anthropic.TextBlockParam{
 			Text: promptText,
 		}
-		if ec.config.EnablePromptCaching != nil && *ec.config.EnablePromptCaching {
-			systemPrompt.CacheControl = anthropic.NewCacheControlEphemeralParam()
-			if ec.config.CacheTTL == "1h" {
-				systemPrompt.CacheControl.TTL = "1h"
-			}
+		if ec.cachingEnabled() {
+			systemPrompt.CacheControl = ec.newCacheControl()
 		}
 
 		stream := ec.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
@@ -365,18 +358,12 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 
 		// Check stop reason
 		if message.StopReason == anthropic.StopReasonEndTurn {
-			step.EndTime = time.Now()
-			step.Duration = step.EndTime.Sub(stepStart)
-			trace.Steps = append(trace.Steps, step)
-			// Model finished without tool use
+			finalizeStep(&step, trace)
 			break
 		}
 
 		if message.StopReason != anthropic.StopReasonToolUse {
-			step.EndTime = time.Now()
-			step.Duration = step.EndTime.Sub(stepStart)
-			trace.Steps = append(trace.Steps, step)
-			// Unexpected stop reason
+			finalizeStep(&step, trace)
 			break
 		}
 
@@ -404,9 +391,7 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 			}
 		}
 
-		step.EndTime = time.Now()
-		step.Duration = step.EndTime.Sub(stepStart)
-		trace.Steps = append(trace.Steps, step)
+		finalizeStep(&step, trace)
 
 		// If no tool results, we're done
 		if len(toolResults) == 0 {
@@ -470,7 +455,6 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 }
 
 // RunEvals executes multiple evaluations and returns all results.
-// Each eval reuses the same MCP session for efficiency.
 // Individual eval failures are captured in EvalRunResult.Error and don't stop the batch.
 func (ec *EvalClient) RunEvals(ctx context.Context, evals []Eval) ([]EvalRunResult, error) {
 	results := make([]EvalRunResult, len(evals))
@@ -501,31 +485,23 @@ func (ec *EvalClient) formatDimensionCriteria(dimension string, criteria *Dimens
 		fmt.Fprintf(&sb, "%s\n\n", criteria.Description)
 	}
 
-	if len(criteria.MustHave) > 0 {
-		sb.WriteString("**Must have for high scores (4-5):**\n")
-		for _, item := range criteria.MustHave {
-			fmt.Fprintf(&sb, "- %s\n", item)
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(criteria.NiceToHave) > 0 {
-		sb.WriteString("**Nice to have:**\n")
-		for _, item := range criteria.NiceToHave {
-			fmt.Fprintf(&sb, "- %s\n", item)
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(criteria.Penalties) > 0 {
-		sb.WriteString("**Score reductions:**\n")
-		for _, item := range criteria.Penalties {
-			fmt.Fprintf(&sb, "- %s\n", item)
-		}
-		sb.WriteString("\n")
-	}
+	writeBulletSection(&sb, "**Must have for high scores (4-5):**", criteria.MustHave)
+	writeBulletSection(&sb, "**Nice to have:**", criteria.NiceToHave)
+	writeBulletSection(&sb, "**Score reductions:**", criteria.Penalties)
 
 	return sb.String()
+}
+
+// writeBulletSection writes a markdown bullet list under a header, or nothing if items is empty.
+func writeBulletSection(sb *strings.Builder, header string, items []string) {
+	if len(items) == 0 {
+		return
+	}
+	sb.WriteString(header + "\n")
+	for _, item := range items {
+		fmt.Fprintf(sb, "- %s\n", item)
+	}
+	sb.WriteString("\n")
 }
 
 // buildGradingPrompt constructs the full grading prompt including rubric criteria
@@ -612,11 +588,8 @@ func (ec *EvalClient) gradeWithTrace(ctx context.Context, eval Eval, evalResult 
 	gradingSystemPrompt := anthropic.TextBlockParam{
 		Text: EvalSystemPrompt,
 	}
-	if ec.config.EnablePromptCaching != nil && *ec.config.EnablePromptCaching {
-		gradingSystemPrompt.CacheControl = anthropic.NewCacheControlEphemeralParam()
-		if ec.config.CacheTTL == "1h" {
-			gradingSystemPrompt.CacheControl.TTL = "1h"
-		}
+	if ec.cachingEnabled() {
+		gradingSystemPrompt.CacheControl = ec.newCacheControl()
 	}
 
 	// Execute grading
@@ -640,7 +613,16 @@ func (ec *EvalClient) gradeWithTrace(ctx context.Context, eval Eval, evalResult 
 	}
 
 	// Capture raw response and token usage
-	rawResponse := resp.Content[0].AsAny().(anthropic.TextBlock).Text
+	if len(resp.Content) == 0 {
+		trace.Error = "empty grading response"
+		return nil, trace, fmt.Errorf("grading response contained no content")
+	}
+	textBlock, ok := resp.Content[0].AsAny().(anthropic.TextBlock)
+	if !ok {
+		trace.Error = "unexpected grading response content type"
+		return nil, trace, fmt.Errorf("grading response was not a text block")
+	}
+	rawResponse := textBlock.Text
 	trace.RawGradingOutput = rawResponse
 	trace.InputTokens = int(resp.Usage.InputTokens)
 	trace.OutputTokens = int(resp.Usage.OutputTokens)
@@ -851,4 +833,25 @@ type GradingTrace struct {
 // This generic helper simplifies creating pointers to literals or values.
 func toPtr[T any](v T) *T {
 	return &v
+}
+
+// cachingEnabled returns true if prompt caching is enabled in the config.
+func (ec *EvalClient) cachingEnabled() bool {
+	return ec.config.EnablePromptCaching != nil && *ec.config.EnablePromptCaching
+}
+
+// newCacheControl builds an ephemeral cache control param with the configured TTL.
+func (ec *EvalClient) newCacheControl() anthropic.CacheControlEphemeralParam {
+	cc := anthropic.NewCacheControlEphemeralParam()
+	if ec.config.CacheTTL == "1h" {
+		cc.TTL = "1h"
+	}
+	return cc
+}
+
+// finalizeStep records the end time, duration, and appends the step to the trace.
+func finalizeStep(step *AgenticStep, trace *EvalTrace) {
+	step.EndTime = time.Now()
+	step.Duration = step.EndTime.Sub(step.StartTime)
+	trace.Steps = append(trace.Steps, *step)
 }
