@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/lipgloss/v2/table"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	evaluations "github.com/wolfeidau/mcp-evals"
 	"github.com/wolfeidau/mcp-evals/internal/help"
 )
@@ -198,24 +198,24 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 	output.WriteString(h2(styles, "Overall Statistics"))
 
 	// Total evaluations
-	output.WriteString(fmt.Sprintf("Total Evaluations: %d\n", totalEvals))
+	fmt.Fprintf(&output, "Total Evaluations: %d\n", totalEvals)
 
 	// Pass/Fail/Error breakdown
 	if passCount > 0 {
 		passStr := styles.Success.Render(fmt.Sprintf("✓ Pass:   %d (%.0f%%)", passCount, float64(passCount)/float64(totalEvals)*100))
-		output.WriteString(fmt.Sprintf("  %s\n", passStr))
+		fmt.Fprintf(&output, "  %s\n", passStr)
 	}
 	if failCount > 0 {
 		failStr := styles.Error.Render(fmt.Sprintf("✗ Fail:   %d (%.0f%%)", failCount, float64(failCount)/float64(totalEvals)*100))
-		output.WriteString(fmt.Sprintf("  %s\n", failStr))
+		fmt.Fprintf(&output, "  %s\n", failStr)
 	}
 	if errorCount > 0 {
 		errorStr := styles.Error.Render(fmt.Sprintf("⚠ Error:  %d (%.0f%%)", errorCount, float64(errorCount)/float64(totalEvals)*100))
-		output.WriteString(fmt.Sprintf("  %s\n", errorStr))
+		fmt.Fprintf(&output, "  %s\n", errorStr)
 	}
 	if noGradeCount > 0 {
 		noGradeStr := styles.Muted.Render(fmt.Sprintf("○ No Grade: %d", noGradeCount))
-		output.WriteString(fmt.Sprintf("  %s\n", noGradeStr))
+		fmt.Fprintf(&output, "  %s\n", noGradeStr)
 	}
 	output.WriteString("\n")
 
@@ -224,19 +224,19 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 		output.WriteString(h3(styles, "Performance Metrics"))
 
 		if totalDuration > 0 {
-			output.WriteString(fmt.Sprintf("Total Duration:     %s\n", formatDuration(totalDuration)))
+			fmt.Fprintf(&output, "Total Duration:     %s\n", formatDuration(totalDuration))
 		}
 
 		if totalInputTokens > 0 {
-			output.WriteString(fmt.Sprintf("Total Tokens:       %s (I) → %s (O)\n",
+			fmt.Fprintf(&output, "Total Tokens:       %s (I) → %s (O)\n",
 				formatTokens(totalInputTokens),
-				formatTokens(totalOutputTokens)))
+				formatTokens(totalOutputTokens))
 
 			avgInput := totalInputTokens / totalEvals
 			avgOutput := totalOutputTokens / totalEvals
-			output.WriteString(fmt.Sprintf("Avg Tokens/Eval:    %s (I) → %s (O)\n",
+			fmt.Fprintf(&output, "Avg Tokens/Eval:    %s (I) → %s (O)\n",
 				formatTokens(avgInput),
-				formatTokens(avgOutput)))
+				formatTokens(avgOutput))
 		}
 		output.WriteString("\n")
 	}
@@ -244,7 +244,7 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 	// Tool execution stats
 	if totalToolCalls > 0 {
 		output.WriteString(h3(styles, "Tool Execution"))
-		output.WriteString(fmt.Sprintf("Total Tool Calls:   %d\n", totalToolCalls))
+		fmt.Fprintf(&output, "Total Tool Calls:   %d\n", totalToolCalls)
 
 		successRateOverall := float64(successfulToolCalls) / float64(totalToolCalls) * 100
 		successRateStr := fmt.Sprintf("%.0f%% (%d/%d)", successRateOverall, successfulToolCalls, totalToolCalls)
@@ -253,12 +253,12 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 		} else if successRateOverall < 50 {
 			successRateStr = styles.Error.Render(successRateStr)
 		}
-		output.WriteString(fmt.Sprintf("Success Rate:       %s\n", successRateStr))
+		fmt.Fprintf(&output, "Success Rate:       %s\n", successRateStr)
 
 		if totalToolCalls > successfulToolCalls {
 			failedCalls := totalToolCalls - successfulToolCalls
-			output.WriteString(fmt.Sprintf("Failed Calls:       %s\n",
-				styles.Error.Render(fmt.Sprintf("%d", failedCalls))))
+			fmt.Fprintf(&output, "Failed Calls:       %s\n",
+				styles.Error.Render(fmt.Sprintf("%d", failedCalls)))
 		}
 		output.WriteString("\n")
 	}
@@ -268,13 +268,13 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 		output.WriteString(h3(styles, "Cache Performance"))
 
 		if totalCacheCreationTokens > 0 {
-			output.WriteString(fmt.Sprintf("Cache Writes:       %s tokens\n",
-				formatTokens(totalCacheCreationTokens)))
+			fmt.Fprintf(&output, "Cache Writes:       %s tokens\n",
+				formatTokens(totalCacheCreationTokens))
 		}
 
 		if totalCacheReadTokens > 0 {
-			output.WriteString(fmt.Sprintf("Cache Reads:        %s tokens\n",
-				formatTokens(totalCacheReadTokens)))
+			fmt.Fprintf(&output, "Cache Reads:        %s tokens\n",
+				formatTokens(totalCacheReadTokens))
 
 			// Calculate cache hit rate
 			totalCacheableTokens := totalInputTokens
@@ -284,15 +284,15 @@ func captureOverallStats(results []evaluations.EvalRunResult, styles help.Styles
 				if cacheHitRate >= 50 {
 					cacheHitRateStr = styles.Success.Render(cacheHitRateStr)
 				}
-				output.WriteString(fmt.Sprintf("Cache Hit Rate:     %s\n", cacheHitRateStr))
+				fmt.Fprintf(&output, "Cache Hit Rate:     %s\n", cacheHitRateStr)
 			}
 
 			// Estimate cost savings (cache reads are 90% cheaper)
 			// This is an approximation based on Anthropic's pricing
 			estimatedSavings := float64(totalCacheReadTokens) * 0.9
 			if estimatedSavings > 1000 {
-				output.WriteString(fmt.Sprintf("Est. Token Savings: ~%s tokens (90%% discount on reads)\n",
-					formatTokens(int(estimatedSavings))))
+				fmt.Fprintf(&output, "Est. Token Savings: ~%s tokens (90%% discount on reads)\n",
+					formatTokens(int(estimatedSavings)))
 			}
 		}
 		output.WriteString("\n")
@@ -332,8 +332,8 @@ func captureEvalDetail(result evaluations.EvalRunResult, styles help.Styles) str
 	// Status
 	switch {
 	case result.Error != nil:
-		output.WriteString(fmt.Sprintf("Status: %s\n", styles.Error.Render("ERROR")))
-		output.WriteString(fmt.Sprintf("Error: %s\n", result.Error.Error()))
+		fmt.Fprintf(&output, "Status: %s\n", styles.Error.Render("ERROR"))
+		fmt.Fprintf(&output, "Error: %s\n", result.Error.Error())
 	case result.Grade != nil:
 		avg := avgScore(result.Grade)
 		statusText := "PASS"
@@ -342,9 +342,9 @@ func captureEvalDetail(result evaluations.EvalRunResult, styles help.Styles) str
 			statusText = "FAIL"
 			statusStyle = styles.Error
 		}
-		output.WriteString(fmt.Sprintf("Status: %s (%.1f/5)\n", statusStyle.Render(statusText), avg))
+		fmt.Fprintf(&output, "Status: %s (%.1f/5)\n", statusStyle.Render(statusText), avg)
 	default:
-		output.WriteString(fmt.Sprintf("Status: %s\n", styles.Muted.Render("NO GRADE")))
+		fmt.Fprintf(&output, "Status: %s\n", styles.Muted.Render("NO GRADE"))
 	}
 	output.WriteString("\n")
 
@@ -370,25 +370,25 @@ func captureEvalDetail(result evaluations.EvalRunResult, styles help.Styles) str
 				step.CacheCreationInputTokens,
 				step.CacheReadInputTokens,
 			)
-			output.WriteString(fmt.Sprintf("Step %d: (%s, %s)\n",
+			fmt.Fprintf(&output, "Step %d: (%s, %s)\n",
 				step.StepNumber,
 				formatDuration(step.Duration),
-				tokensStr))
+				tokensStr)
 
 			// Show tool calls
 			for _, tool := range step.ToolCalls {
 				if tool.Success {
-					output.WriteString(fmt.Sprintf("  Tool: %s\n", tool.ToolName))
-					output.WriteString(fmt.Sprintf("    %s (%s)\n",
+					fmt.Fprintf(&output, "  Tool: %s\n", tool.ToolName)
+					fmt.Fprintf(&output, "    %s (%s)\n",
 						styles.Success.Render("✓ Success"),
-						formatDuration(tool.Duration)))
+						formatDuration(tool.Duration))
 				} else {
-					output.WriteString(fmt.Sprintf("  Tool: %s\n", tool.ToolName))
-					output.WriteString(fmt.Sprintf("    %s (%s)\n",
+					fmt.Fprintf(&output, "  Tool: %s\n", tool.ToolName)
+					fmt.Fprintf(&output, "    %s (%s)\n",
 						styles.Error.Render("✗ Failed"),
-						formatDuration(tool.Duration)))
+						formatDuration(tool.Duration))
 					if tool.Error != "" {
-						output.WriteString(fmt.Sprintf("    Error: %s\n", tool.Error))
+						fmt.Fprintf(&output, "    Error: %s\n", tool.Error)
 					}
 				}
 			}
@@ -432,7 +432,7 @@ func captureEvalDetail(result evaluations.EvalRunResult, styles help.Styles) str
 			scoreColor := getScoreColor(g.value, styles)
 			bar := makeScoreBar(g.value)
 			scoredBar := lipgloss.NewStyle().Foreground(scoreColor).Render(bar)
-			output.WriteString(fmt.Sprintf("%-13s %d  %s\n", g.name+":", g.value, scoredBar))
+			fmt.Fprintf(&output, "%-13s %d  %s\n", g.name+":", g.value, scoredBar)
 		}
 
 		comments := lipgloss.NewStyle().
