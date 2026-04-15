@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/charmbracelet/lipgloss/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/rs/zerolog/log"
 	evaluations "github.com/wolfeidau/mcp-evals"
 	"github.com/wolfeidau/mcp-evals/internal/help"

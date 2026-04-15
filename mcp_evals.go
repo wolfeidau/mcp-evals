@@ -495,16 +495,16 @@ func (ec *EvalClient) RunEvals(ctx context.Context, evals []Eval) ([]EvalRunResu
 func (ec *EvalClient) formatDimensionCriteria(dimension string, criteria *DimensionCriteria) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("### %s\n", dimension))
+	fmt.Fprintf(&sb, "### %s\n", dimension)
 
 	if criteria.Description != "" {
-		sb.WriteString(fmt.Sprintf("%s\n\n", criteria.Description))
+		fmt.Fprintf(&sb, "%s\n\n", criteria.Description)
 	}
 
 	if len(criteria.MustHave) > 0 {
 		sb.WriteString("**Must have for high scores (4-5):**\n")
 		for _, item := range criteria.MustHave {
-			sb.WriteString(fmt.Sprintf("- %s\n", item))
+			fmt.Fprintf(&sb, "- %s\n", item)
 		}
 		sb.WriteString("\n")
 	}
@@ -512,7 +512,7 @@ func (ec *EvalClient) formatDimensionCriteria(dimension string, criteria *Dimens
 	if len(criteria.NiceToHave) > 0 {
 		sb.WriteString("**Nice to have:**\n")
 		for _, item := range criteria.NiceToHave {
-			sb.WriteString(fmt.Sprintf("- %s\n", item))
+			fmt.Fprintf(&sb, "- %s\n", item)
 		}
 		sb.WriteString("\n")
 	}
@@ -520,7 +520,7 @@ func (ec *EvalClient) formatDimensionCriteria(dimension string, criteria *Dimens
 	if len(criteria.Penalties) > 0 {
 		sb.WriteString("**Score reductions:**\n")
 		for _, item := range criteria.Penalties {
-			sb.WriteString(fmt.Sprintf("- %s\n", item))
+			fmt.Fprintf(&sb, "- %s\n", item)
 		}
 		sb.WriteString("\n")
 	}
@@ -533,8 +533,8 @@ func (ec *EvalClient) buildGradingPrompt(eval Eval, evalResult *EvalResult, exec
 	var prompt strings.Builder
 
 	// Standard context
-	prompt.WriteString(fmt.Sprintf("Here is the user input: %s\n", evalResult.Prompt))
-	prompt.WriteString(fmt.Sprintf("Here is the LLM's answer: %s\n", evalResult.RawResponse))
+	fmt.Fprintf(&prompt, "Here is the user input: %s\n", evalResult.Prompt)
+	fmt.Fprintf(&prompt, "Here is the LLM's answer: %s\n", evalResult.RawResponse)
 
 	// Add tool execution context
 	if execTrace != nil && execTrace.ToolCallCount > 0 {
@@ -542,15 +542,15 @@ func (ec *EvalClient) buildGradingPrompt(eval Eval, evalResult *EvalResult, exec
 		prompt.WriteString("The LLM had access to and successfully called the following tools to gather information:\n")
 		for _, step := range execTrace.Steps {
 			for _, toolCall := range step.ToolCalls {
-				prompt.WriteString(fmt.Sprintf("\n- Tool: '%s'\n", toolCall.ToolName))
+				fmt.Fprintf(&prompt, "\n- Tool: '%s'\n", toolCall.ToolName)
 				if toolCall.Success {
 					prompt.WriteString("  Status: SUCCESS\n")
 					if len(toolCall.Output) > 0 {
 						// Include the actual tool output so grader can verify data accuracy
-						prompt.WriteString(fmt.Sprintf("  Returned data: %s\n", string(toolCall.Output)))
+						fmt.Fprintf(&prompt, "  Returned data: %s\n", string(toolCall.Output))
 					}
 				} else {
-					prompt.WriteString(fmt.Sprintf("  Status: FAILED - %s\n", toolCall.Error))
+					fmt.Fprintf(&prompt, "  Status: FAILED - %s\n", toolCall.Error)
 				}
 			}
 		}
@@ -581,7 +581,7 @@ func (ec *EvalClient) buildGradingPrompt(eval Eval, evalResult *EvalResult, exec
 		if len(eval.GradingRubric.MinimumScores) > 0 {
 			prompt.WriteString("\n### Minimum Acceptable Scores:\n")
 			for dim, score := range eval.GradingRubric.MinimumScores {
-				prompt.WriteString(fmt.Sprintf("- %s: %d/5\n", dim, score))
+				fmt.Fprintf(&prompt, "- %s: %d/5\n", dim, score)
 			}
 		}
 	}
