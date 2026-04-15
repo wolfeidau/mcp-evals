@@ -72,7 +72,7 @@ func LoadConfig(filePath string) (*EvalConfig, error) {
 
 **Configuration file** (`matrix.yaml`):
 ```yaml
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 
 mcp_server:
   command: ${MCP_SERVER_PATH}
@@ -154,7 +154,7 @@ steps:
           - "1.0.0"
           - "2.0.0"
         model:
-          - "claude-3-5-sonnet-20241022"
+          - "claude-sonnet-4-6"
           - "claude-sonnet-4-5-20250929"
         suite:
           - "auth.*"
@@ -427,7 +427,7 @@ func TestLoadConfig_EnvironmentVariableExpansion(t *testing.T) {
 
     // Create temporary config file with env vars
     configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${TEST_COMMAND}
   args:
@@ -456,7 +456,7 @@ func TestLoadConfig_UndefinedEnvironmentVariable(t *testing.T) {
     assert := require.New(t)
 
     configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${UNDEFINED_VAR}
 evals:
@@ -478,7 +478,7 @@ func TestLoadConfig_DefaultValues(t *testing.T) {
     t.Setenv("CUSTOM_PORT", "9000")
 
     configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: server
   args:
@@ -593,7 +593,7 @@ func TestE2E_EnvironmentVariableExpansion(t *testing.T) {
 
     // Create config with env vars
     configContent := fmt.Sprintf(`
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${TEST_SERVER_PATH}
   args: []

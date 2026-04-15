@@ -16,7 +16,7 @@ func TestLoadConfig_YAML(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify basic fields
-	assert.Equal("claude-3-5-sonnet-20241022", config.Model)
+	assert.Equal("claude-sonnet-4-6", config.Model)
 	assert.Equal("2m", config.Timeout)
 	assert.EqualValues(10, config.MaxSteps)
 	assert.EqualValues(4096, config.MaxTokens)
@@ -228,7 +228,7 @@ func TestValidateConfigFile_MissingMCPServerCommand(t *testing.T) {
 	assert := require.New(t)
 
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 
 mcp_server:
   args: ["test"]
@@ -261,7 +261,7 @@ func TestValidateConfigFile_MissingEvals(t *testing.T) {
 	assert := require.New(t)
 
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 
 mcp_server:
   command: echo
@@ -291,7 +291,7 @@ func TestValidateConfigFile_InvalidEval(t *testing.T) {
 	assert := require.New(t)
 
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 
 mcp_server:
   command: echo
@@ -369,7 +369,7 @@ func TestValidateConfigFile_JSONFormat(t *testing.T) {
 	assert := require.New(t)
 
 	configContent := `{
-  "model": "claude-3-5-sonnet-20241022",
+  "model": "claude-sonnet-4-6",
   "mcp_server": {
     "command": "echo",
     "args": ["test"]
@@ -406,7 +406,7 @@ func TestLoadConfig_EnvironmentVariableExpansion(t *testing.T) {
 
 	// Create temporary config file with env vars
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${TEST_COMMAND}
   args:
@@ -443,7 +443,7 @@ func TestLoadConfig_UndefinedEnvironmentVariable(t *testing.T) {
 	assert := require.New(t)
 
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${UNDEFINED_VAR}server
   args: []
@@ -472,7 +472,7 @@ func TestLoadConfig_DefaultValues(t *testing.T) {
 	t.Setenv("CUSTOM_PORT", "9000")
 
 	configContent := `
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: server
   args:
@@ -499,7 +499,7 @@ evals:
 func TestLoadConfig_EnvironmentVariableInJSON(t *testing.T) {
 	assert := require.New(t)
 
-	t.Setenv("TEST_MODEL", "claude-3-5-sonnet-20241022")
+	t.Setenv("TEST_MODEL", "claude-sonnet-4-6")
 	t.Setenv("TEST_SERVER", "/path/to/server")
 
 	configContent := `{
@@ -526,6 +526,6 @@ func TestLoadConfig_EnvironmentVariableInJSON(t *testing.T) {
 
 	config, err := LoadConfig(tmpFile.Name())
 	assert.NoError(err)
-	assert.Equal("claude-3-5-sonnet-20241022", config.Model)
+	assert.Equal("claude-sonnet-4-6", config.Model)
 	assert.Equal("/path/to/server", config.MCPServer.Command)
 }

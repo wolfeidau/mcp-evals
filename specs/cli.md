@@ -302,7 +302,7 @@ mcp-evals validate --config testdata/mcp-test-evals.yaml
 Output:
 ```
 ✓ Configuration is valid
-  - Model: claude-3-5-sonnet-20241022
+  - Model: claude-sonnet-4-6
   - MCP Server: go run testdata/mcp-test-server/main.go
   - Evals: 3
 ```
@@ -387,8 +387,8 @@ The CLI loads configuration from YAML or JSON files using the existing `LoadConf
 ### Config File Structure
 
 ```yaml
-model: claude-3-5-sonnet-20241022
-grading_model: claude-3-5-sonnet-20241022  # optional
+model: claude-sonnet-4-6
+grading_model: claude-sonnet-4-6  # optional
 timeout: 2m                                  # optional
 max_steps: 10                                # optional
 max_tokens: 4096                             # optional

@@ -27,7 +27,7 @@ go install github.com/wolfeidau/mcp-evals/cmd/mcp-evals@latest
 Create an evaluation config file (e.g., `evals.yaml`):
 
 ```yaml
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: npx
   args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
@@ -69,7 +69,7 @@ Configuration files support environment variable interpolation using shell synta
 
 **Example configuration** (`matrix.yaml`):
 ```yaml
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 mcp_server:
   command: ${MCP_SERVER_PATH}
   args:

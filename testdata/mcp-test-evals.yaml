@@ -1,5 +1,5 @@
-model: claude-3-5-sonnet-20241022
-grading_model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
+grading_model: claude-sonnet-4-6
 timeout: 2m
 max_steps: 10
 max_tokens: 4096
