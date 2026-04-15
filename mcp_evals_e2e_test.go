@@ -30,7 +30,7 @@ func TestE2E_BasicEvaluation(t *testing.T) {
 		Args:         []string{},
 		Env:          []string{},
 		Model:        "claude-sonnet-4-5-20250929", // claude-sonnet-4-0
-		GradingModel: "claude-3-5-sonnet-20241022",
+		GradingModel: "claude-sonnet-4-6",
 	}
 
 	client := NewEvalClient(config)
@@ -97,7 +97,7 @@ func TestE2E_MultipleTools(t *testing.T) {
 		Command: serverPath,
 		Args:    []string{},
 		Env:     []string{},
-		Model:   "claude-3-5-sonnet-20241022",
+		Model:   "claude-sonnet-4-6",
 	}
 
 	client := NewEvalClient(config)
@@ -165,7 +165,7 @@ func TestE2E_EnvironmentVariables(t *testing.T) {
 		Command: serverPath,
 		Args:    []string{},
 		Env:     []string{"TEST_API_TOKEN=" + testToken},
-		Model:   "claude-3-5-sonnet-20241022",
+		Model:   "claude-sonnet-4-6",
 	}
 
 	client := NewEvalClient(config)
@@ -229,7 +229,7 @@ func TestE2E_GradingScores(t *testing.T) {
 		Command: serverPath,
 		Args:    []string{},
 		Env:     []string{},
-		Model:   "claude-3-5-sonnet-20241022",
+		Model:   "claude-sonnet-4-6",
 	}
 
 	client := NewEvalClient(config)

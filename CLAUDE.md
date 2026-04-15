@@ -69,7 +69,7 @@ go test -cover ./...
 - `Command`: MCP server command to execute
 - `Args`: Arguments for the MCP server command
 - `Env`: Environment variables for the MCP server
-- `Model`: Anthropic model ID to use (e.g., "claude-3-5-sonnet-20241022")
+- `Model`: Anthropic model ID to use (e.g., "claude-sonnet-4-6")
 
 ## Code Style
 - **Logging**: ALWAYS use `"github.com/rs/zerolog/log"` for all logging operations

@@ -131,7 +131,7 @@ When `minimum_scores` are specified in a rubric, the system can enforce these th
 **Configuration**: Use the top-level `enforce_minimum_scores` field (defaults to `true`):
 
 ```yaml
-model: claude-3-5-sonnet-20241022
+model: claude-sonnet-4-6
 enforce_minimum_scores: true  # Default: true; set to false during rubric development
 
 evals:
