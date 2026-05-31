@@ -226,7 +226,9 @@ func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-mcp-server",
 		Version: "v1.0.0",
-	}, nil)
+	}, &mcp.ServerOptions{
+		Instructions: "Use the test MCP server tools to answer evaluation prompts. Prefer get_user for user profile questions and get_system_logs for log troubleshooting questions.",
+	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add",
