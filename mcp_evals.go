@@ -107,7 +107,7 @@ func NewEvalClient(config EvalClientConfig) *EvalClient {
 }
 
 // loadMCPSession creates an MCP client, connects to the server, and retrieves available tools
-func (ec *EvalClient) loadMCPSession(ctx context.Context) (*mcp.ClientSession, *mcp.ListToolsResult, error) {
+func (ec *EvalClient) loadMCPSession(ctx context.Context) (*mcp.ClientSession, *mcp.ListToolsResult, string, error) {
 	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	// #nosec G204 - Command and args are provided by the library caller as part of EvalClientConfig
 	cmd := exec.Command(ec.config.Command, ec.config.Args...)
@@ -116,7 +116,7 @@ func (ec *EvalClient) loadMCPSession(ctx context.Context) (*mcp.ClientSession, *
 	if ec.config.StderrCallback != nil {
 		stderrPipe, err := cmd.StderrPipe()
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+			return nil, nil, "", fmt.Errorf("failed to create stderr pipe: %w", err)
 		}
 
 		// Spawn goroutine to read stderr line-by-line and invoke callback
@@ -125,7 +125,9 @@ func (ec *EvalClient) loadMCPSession(ctx context.Context) (*mcp.ClientSession, *
 			for scanner.Scan() {
 				ec.config.StderrCallback(scanner.Text())
 			}
-			// Ignore scanner errors as they typically occur when the process exits
+			if err := scanner.Err(); err != nil {
+				log.Debug().Err(err).Msg("failed to read MCP server stderr")
+			}
 		}()
 	} else {
 		cmd.Stderr = os.Stderr // forward subprocess stderr for visibility (backward compatible)
@@ -142,17 +144,22 @@ func (ec *EvalClient) loadMCPSession(ctx context.Context) (*mcp.ClientSession, *
 
 	session, err := mcpClient.Connect(ctx, transport, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create MCP client: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to create MCP client: %w", err)
+	}
+
+	var serverInstructions string
+	if initializeResult := session.InitializeResult(); initializeResult != nil {
+		serverInstructions = initializeResult.Instructions
 	}
 
 	// get all the tools
 	toolsResp, err := session.ListTools(ctx, nil)
 	if err != nil {
 		_ = session.Close()
-		return nil, nil, fmt.Errorf("failed to list tools: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to list tools: %w", err)
 	}
 
-	return session, toolsResp, nil
+	return session, toolsResp, serverInstructions, nil
 }
 
 // executeAndTraceToolCall executes a single MCP tool call and captures complete trace data
@@ -226,11 +233,12 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 		Trace: trace,
 	}
 
-	session, toolsResp, err := ec.loadMCPSession(ctx)
+	session, toolsResp, serverInstructions, err := ec.loadMCPSession(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = session.Close() }()
+	trace.ServerInstructions = serverInstructions
 
 	// convert the tools to the format expected by the anthropic model
 	toolParams := make([]anthropic.ToolParam, 0, len(toolsResp.Tools))
@@ -288,31 +296,14 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 			ToolCalls:  make([]ToolCall, 0),
 		}
 
-		// Build system prompt with optional cache control
-		// Precedence: per-eval > client config > default constant
-		promptText := AgentSystemPrompt
-		if ec.config.AgentSystemPrompt != "" {
-			promptText = ec.config.AgentSystemPrompt
-		}
-		if eval.AgentSystemPrompt != "" {
-			promptText = eval.AgentSystemPrompt
-		}
-
-		systemPrompt := anthropic.TextBlockParam{
-			Text: promptText,
-		}
-		if ec.cachingEnabled() {
-			systemPrompt.CacheControl = ec.newCacheControl()
-		}
+		systemPrompt := ec.buildAgentSystemPrompt(eval, serverInstructions)
 
 		stream := ec.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
 			Model:     anthropic.Model(ec.config.Model),
 			MaxTokens: int64(ec.config.MaxTokens),
-			System: []anthropic.TextBlockParam{
-				systemPrompt,
-			},
-			Messages: messages,
-			Tools:    tools,
+			System:    systemPrompt,
+			Messages:  messages,
+			Tools:     tools,
 		})
 
 		message := anthropic.Message{}
@@ -454,6 +445,36 @@ func (ec *EvalClient) RunEval(ctx context.Context, eval Eval) (*EvalRunResult, e
 	return result, nil
 }
 
+func (ec *EvalClient) buildAgentSystemPrompt(eval Eval, serverInstructions string) []anthropic.TextBlockParam {
+	// Precedence: per-eval > client config > default constant
+	promptText := AgentSystemPrompt
+	if ec.config.AgentSystemPrompt != "" {
+		promptText = ec.config.AgentSystemPrompt
+	}
+	if eval.AgentSystemPrompt != "" {
+		promptText = eval.AgentSystemPrompt
+	}
+
+	systemPrompt := []anthropic.TextBlockParam{
+		{
+			Text: promptText,
+		},
+	}
+
+	if instructions := strings.TrimSpace(serverInstructions); instructions != "" {
+		systemPrompt = append(systemPrompt, anthropic.TextBlockParam{
+			Text: fmt.Sprintf("MCP server instructions:\n%s", instructions),
+		})
+	}
+
+	if ec.cachingEnabled() {
+		lastIdx := len(systemPrompt) - 1
+		systemPrompt[lastIdx].CacheControl = ec.newCacheControl()
+	}
+
+	return systemPrompt
+}
+
 // RunEvals executes multiple evaluations and returns all results.
 // Individual eval failures are captured in EvalRunResult.Error and don't stop the batch.
 func (ec *EvalClient) RunEvals(ctx context.Context, evals []Eval) ([]EvalRunResult, error) {
@@ -497,7 +518,8 @@ func writeBulletSection(sb *strings.Builder, header string, items []string) {
 	if len(items) == 0 {
 		return
 	}
-	sb.WriteString(header + "\n")
+	sb.WriteString(header)
+	sb.WriteByte('\n')
 	for _, item := range items {
 		fmt.Fprintf(sb, "- %s\n", item)
 	}
@@ -772,15 +794,16 @@ type EvalRunResult struct {
 
 // EvalTrace captures complete execution history of an evaluation run
 type EvalTrace struct {
-	Steps                    []AgenticStep `json:"steps"`                       // Each step in the agentic loop
-	Grading                  *GradingTrace `json:"grading,omitempty"`           // Grading interaction details
-	TotalDuration            time.Duration `json:"total_duration"`              // Total execution time
-	TotalInputTokens         int           `json:"total_input_tokens"`          // Sum of input tokens across all steps
-	TotalOutputTokens        int           `json:"total_output_tokens"`         // Sum of output tokens across all steps
-	StepCount                int           `json:"step_count"`                  // Number of agentic steps executed
-	ToolCallCount            int           `json:"tool_call_count"`             // Total number of tool calls made
-	TotalCacheCreationTokens int           `json:"total_cache_creation_tokens"` // Sum of cache creation tokens across all steps
-	TotalCacheReadTokens     int           `json:"total_cache_read_tokens"`     // Sum of cache read tokens across all steps
+	Steps                    []AgenticStep `json:"steps"`                         // Each step in the agentic loop
+	Grading                  *GradingTrace `json:"grading,omitempty"`             // Grading interaction details
+	ServerInstructions       string        `json:"server_instructions,omitempty"` // Instructions returned by the MCP server
+	TotalDuration            time.Duration `json:"total_duration"`                // Total execution time
+	TotalInputTokens         int           `json:"total_input_tokens"`            // Sum of input tokens across all steps
+	TotalOutputTokens        int           `json:"total_output_tokens"`           // Sum of output tokens across all steps
+	StepCount                int           `json:"step_count"`                    // Number of agentic steps executed
+	ToolCallCount            int           `json:"tool_call_count"`               // Total number of tool calls made
+	TotalCacheCreationTokens int           `json:"total_cache_creation_tokens"`   // Sum of cache creation tokens across all steps
+	TotalCacheReadTokens     int           `json:"total_cache_read_tokens"`       // Sum of cache read tokens across all steps
 }
 
 // AgenticStep records a single iteration of the agentic loop

@@ -10,6 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const testMCPServerInstructions = "Use the test MCP server tools to answer evaluation prompts. Prefer get_user for user profile questions and get_system_logs for log troubleshooting questions."
+
 func TestEvalClient_loadMCPSession(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -50,7 +52,7 @@ func TestEvalClient_loadMCPSession(t *testing.T) {
 			})
 
 			ctx := context.Background()
-			session, toolsResp, err := client.loadMCPSession(ctx)
+			session, toolsResp, serverInstructions, err := client.loadMCPSession(ctx)
 
 			if tt.expectError {
 				assert.Error(err)
@@ -61,6 +63,7 @@ func TestEvalClient_loadMCPSession(t *testing.T) {
 			defer func() { _ = session.Close() }()
 
 			assert.NotNil(toolsResp)
+			assert.Equal(testMCPServerInstructions, serverInstructions)
 
 			// Verify expected tools are present
 			toolMap := make(map[string]bool)
@@ -90,7 +93,7 @@ func TestEvalClient_loadMCPSession_ToolExecution(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	session, _, err := client.loadMCPSession(ctx)
+	session, _, _, err := client.loadMCPSession(ctx)
 	assert.NoError(err)
 	defer func() { _ = session.Close() }()
 
@@ -133,7 +136,7 @@ func TestEvalClient_loadMCPSession_CustomEnv(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	session, _, err := client.loadMCPSession(ctx)
+	session, _, _, err := client.loadMCPSession(ctx)
 	assert.NoError(err)
 	defer func() { _ = session.Close() }()
 
@@ -183,6 +186,69 @@ func TestEvalClient_loadMCPSession_CustomEnv(t *testing.T) {
 	// PATH should be inherited from parent environment
 	assert.True(output2.Set)
 	assert.NotEmpty(output2.Value)
+}
+
+func TestEvalClient_buildAgentSystemPrompt(t *testing.T) {
+	tests := []struct {
+		name                 string
+		configPrompt         string
+		evalPrompt           string
+		serverInstructions   string
+		expectedBlocks       int
+		expectedBasePrompt   string
+		expectedInstructions string
+	}{
+		{
+			name:               "default prompt without server instructions",
+			expectedBlocks:     1,
+			expectedBasePrompt: AgentSystemPrompt,
+		},
+		{
+			name:                 "adds server instructions as second block",
+			serverInstructions:   "Prefer the search tool first.",
+			expectedBlocks:       2,
+			expectedBasePrompt:   AgentSystemPrompt,
+			expectedInstructions: "MCP server instructions:\nPrefer the search tool first.",
+		},
+		{
+			name:               "uses client config prompt",
+			configPrompt:       "Use the configured prompt.",
+			expectedBlocks:     1,
+			expectedBasePrompt: "Use the configured prompt.",
+		},
+		{
+			name:               "eval prompt overrides client config prompt",
+			configPrompt:       "Use the configured prompt.",
+			evalPrompt:         "Use the eval prompt.",
+			expectedBlocks:     1,
+			expectedBasePrompt: "Use the eval prompt.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := require.New(t)
+
+			client := NewEvalClient(EvalClientConfig{
+				Model:             "test",
+				AgentSystemPrompt: tt.configPrompt,
+			})
+
+			systemPrompt := client.buildAgentSystemPrompt(Eval{
+				AgentSystemPrompt: tt.evalPrompt,
+			}, tt.serverInstructions)
+
+			assert.Len(systemPrompt, tt.expectedBlocks)
+			assert.Equal(tt.expectedBasePrompt, systemPrompt[0].Text)
+
+			lastIdx := len(systemPrompt) - 1
+			assert.NotZero(systemPrompt[lastIdx].CacheControl)
+			if len(systemPrompt) > 1 {
+				assert.Zero(systemPrompt[0].CacheControl)
+				assert.Equal(tt.expectedInstructions, systemPrompt[1].Text)
+			}
+		})
+	}
 }
 
 func TestGradingRubricParsing(t *testing.T) {
