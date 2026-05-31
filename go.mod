@@ -7,12 +7,12 @@ tool github.com/nikolaydubina/go-cover-treemap
 require (
 	charm.land/lipgloss/v2 v2.0.3
 	github.com/alecthomas/kong v1.15.0
-	github.com/anthropics/anthropic-sdk-go v1.43.0
+	github.com/anthropics/anthropic-sdk-go v1.46.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/google/jsonschema-go v0.4.3
-	github.com/modelcontextprotocol/go-sdk v1.6.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rs/zerolog v1.35.1
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.8.4
 	gopkg.in/yaml.v3 v3.0.1
 	mvdan.cc/sh/v3 v3.13.1
 )
